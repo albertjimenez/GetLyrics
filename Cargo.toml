@@ -1,0 +1,18 @@
+[package]
+name = "GetLyrics"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "getlyrics"
+path = "src/main.rs"
+
+[dependencies]
+audiotags = "0.5.0"
+scraper = { version = "0.23.1" }
+futures-io = "0.3.31"
+reqwest = { version = "0.12.15", features = ["native-tls-vendored", "blocking", "json"] }
+log = { version = "0.4.27", features = [] }
+regex = "1.11.1"
+serde = { version = "1.0.219", features = ["derive"] }
+env_logger = "0.11.8"
