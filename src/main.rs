@@ -3,16 +3,16 @@ use std::env;
 use env_logger::{Builder, Env};
 use log::{error, info};
 
+use crate::api::lrclib_api::LrcLibAPI;
 use crate::api::lyric_api::LyricApi;
 use crate::metadata::metadata_extractor::MetadataExtractor;
-use crate::model::data_model::{Lyric, LyricScraperV1, Song, Writer};
-use crate::traits::traits::LyricScraper;
+use crate::model::data_model::{Lyric, Song, Writer};
+use crate::traits::traits::LyricIface;
 
 pub mod model;
 mod api;
 mod metadata;
 mod writer;
-mod scrapper;
 mod traits;
 
 fn main() {
@@ -21,38 +21,52 @@ fn main() {
 
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {
-        panic!("Invalid number of arguments. Usage: GetLyrics /filepath/of/the/song")
+        panic!("Usage: GetLyrics [-k|--karaoke] /path/to/song.mp3");
     }
-    let file_path = &args[1];
-    info!("Processing {}", file_path);
-    let song = Song::new(file_path).unwrap();
-    let md = MetadataExtractor::extract(&song);
-    if md.is_some() {
-        let md = md.unwrap();
-        let mut lyric = LyricApi::get_lyrics(&md);
-        if lyric.is_none() {
-            let lyric_v1 = LyricScraperV1::new();
-            let scrapped_lyric = lyric_v1.fetch_lyrics(&md);
-            if scrapped_lyric.is_err() {
-                error!("{}" ,scrapped_lyric.err().unwrap_or(String::from("Could not find the lyrics using the scrapper.")));
-                return;
-            }
-            let clonned_song = song.clone();
-            lyric = Some(Lyric { lyric: scrapped_lyric.unwrap(), song: clonned_song });
-
-
-
-        }
-        let output_file = Writer::write_lyric(&lyric.unwrap());
-        if output_file.is_some() {
-            info!("SUCCESS: Finished writing lyrics for song {}", &song.filename);
-            return;
-        } else {
-            error!("Could not write lyrics file for song {}", &song.filename);
-            return;
-        }
+    let (karaoke, file_path) = if args.len() == 3 && (args[1] == "-k" || args[1] == "--karaoke") {
+        (true, &args[2])
+    } else if args.len() == 2 {
+        (false, &args[1])
     } else {
-        error!("Could not extract metadata for {}", &song.filename)
+        panic!("Usage: GetLyrics [-k|--karaoke] /path/to/song.mp3");
+    };
+    let song = Song::new(file_path).unwrap();
+    info!("Processing:\n\t {}", &song.filename);
+    match MetadataExtractor::extract(&song) {
+        Some(md) => {
+            let lrclib_api = if karaoke {
+                LrcLibAPI::new_karaoke_lyrics()
+            } else {
+                LrcLibAPI::new_plain_lyrics()
+            };
+
+            match lrclib_api.fetch_lyrics(&md) {
+                Ok(lyric) => {
+                    write_lyric_to_file(&song, &lyric);
+                }
+                Err(_) => {
+                    let secondary_lyric_api = LyricApi::new().fetch_lyrics(&md);
+                    match secondary_lyric_api {
+                        Ok(lyric) => {
+                            write_lyric_to_file(&song, &lyric);
+                        }
+                        Err(e) => {
+                            error!("{}", e)
+                        }
+                    }
+                }
+            }
+        }
+        None => {
+            error!("Could not extract metadata for {}", &song.filename);
+        }
+    }
+}
+
+fn write_lyric_to_file(song: &Song, lyric: &Lyric) {
+    match Writer::write_lyric(&lyric) {
+        Some(path) => info!("SUCCESS: Lyrics written for: {}", &song.filename),
+        None => error!("Could not write lyrics file for song {}", &song.filename),
     }
 }
 

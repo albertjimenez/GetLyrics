@@ -3,7 +3,6 @@ use std::fmt::{Display, Formatter};
 use std::path::{Path, PathBuf};
 
 use log::error;
-use reqwest::blocking::Client;
 
 use crate::model::data_model::AudioExtensions::{AAC, AIFF, FLAC, M4A, MP3, OGG, UNKNOWN, WAV, WMA};
 
@@ -32,8 +31,8 @@ impl Song {
         return Some(Song { filename, extension, filepath: filepath_as_path });
     }
     pub fn empty() -> Song {
-        let (filename, extension, filepath) = (String::new(), AudioExtensions::MP3, PathBuf::new());
-        return Song { filename, extension, filepath };
+        let (filename, extension, filepath) = (String::new(), MP3, PathBuf::new());
+        return Song { filename, extension, filepath, };
     }
     pub fn is_file(&self) -> bool {
         match self.filepath.try_exists() {
@@ -52,6 +51,8 @@ pub struct SongMetadata {
     pub song: Song,
     pub artist: String,
     pub title: String,
+    pub album_title: String,
+    pub duration: Option<u16>
 }
 
 #[derive(Debug, Eq, PartialEq, PartialOrd, Ord, Copy, Clone, Hash)]
@@ -102,6 +103,4 @@ impl Display for AudioExtensions {
 
 pub struct Writer {}
 
-pub struct LyricScraperV1 {
-    pub client: Client,
-}
+

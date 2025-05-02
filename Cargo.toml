@@ -9,7 +9,7 @@ path = "src/main.rs"
 
 [dependencies]
 audiotags = "0.5.0"
-scraper = { version = "0.23.1" }
+symphonia = { version = "0.5.4", features = ["mp3", "flac"] }
 futures-io = "0.3.31"
 reqwest = { version = "0.12.15", features = ["native-tls-vendored", "blocking", "json"] }
 log = { version = "0.4.27", features = [] }

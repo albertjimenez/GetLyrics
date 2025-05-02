@@ -1,32 +1,18 @@
 use std::fmt::format;
-use log::{warn};
-use crate::model::data_model::{Lyric, SongMetadata};
+
 use regex::Regex;
 use serde::Deserialize;
+
+use crate::model::data_model::{Lyric, SongMetadata};
+use crate::traits::traits::LyricIface;
 
 #[derive(Deserialize)]
 struct ApiResponse {
     lyrics: String,
 }
-pub struct LyricApi{}
-impl LyricApi {
-    pub  fn get_lyrics(song_metadata: &SongMetadata) -> Option<Lyric> {
-        let url = format(format_args!("https://api.lyrics.ovh/v1/{}/{}", &song_metadata.artist, &song_metadata.title));
-        let response =  reqwest::blocking::get(url).unwrap();
-        if !response.status().is_success() {
-            warn!("Could not fetch the lyrics. Main method will attempt to retrieve them with scrapping.");
-            return None
-        }
-        else {
-            let api_response: Result<ApiResponse, _> = response.json();
-            if api_response.is_ok() {
-                let lyrics = Self::sanitize_lyrics(&api_response.unwrap().lyrics);
-                return Some(Lyric{lyric: lyrics, song: song_metadata.song.clone()})
-            }
+pub struct LyricApi {}
 
-        }
-        None
-    }
+impl LyricApi {
     fn sanitize_lyrics(lyrics: &str) -> String {
 
         // Replace \r\n and multiple \n with a single newline
@@ -39,5 +25,24 @@ impl LyricApi {
 
         // Trim leading and trailing whitespace
         lyrics.trim().to_string()
+    }
+    pub fn new() -> Self {
+        return LyricApi {};
+    }
+}
+impl LyricIface for LyricApi {
+    fn fetch_lyrics(&self, song_metadata: &SongMetadata) -> Result<Lyric, String> {
+        let url = format(format_args!("https://api.lyrics.ovh/v1/{}/{}", &song_metadata.artist, &song_metadata.title));
+        let response = reqwest::blocking::get(url).unwrap();
+        if !response.status().is_success() {
+            return Err("Lyric not found with LyricsAPI".to_owned());
+        } else {
+            let api_response: Result<ApiResponse, _> = response.json();
+            if api_response.is_ok() {
+                let lyrics = Self::sanitize_lyrics(&api_response.unwrap().lyrics);
+                return Ok(Lyric { lyric: lyrics, song: song_metadata.song.clone() });
+            }
+        }
+        Err("Lyric API is down".to_owned())
     }
 }
