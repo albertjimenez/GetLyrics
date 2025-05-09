@@ -1,23 +1,30 @@
-# 🎵 Lyrics Scraper in Rust
+# 🎵 GetLyrics (Rust-based Lyrics Fetcher)
 
-A fast, reliable, and extensible Rust-based lyrics fetcher. It first tries to retrieve lyrics from the lightweight [Lyrics.ovh](https://lyricsovh.docs.apiary.io/#reference/0/lyrics-of-a-song/search) API. If the lyrics are not found there, it gracefully falls back to scraping them from [letras.com](https://www.letras.com).
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/albertjimenez/GetLyrics)
 
-📝 After fetching the lyrics, the tool writes them to a `.lrc` file placed next to the input `.mp3` file.
+
+A fast, reliable, and extensible Rust-based lyrics fetcher.
+
+✨ **New in latest version:**
+- ❌ **No more web scraping** – cleaner, more stable code.
+- 📉 **Smaller binary size** due to removal of HTML parser and scraping logic.
+- 🎤 **New `--karaoke` mode** to fetch synced lyrics when available.
+
+📝 After fetching the lyrics, the tool writes them to a `.lrc` file placed next to the input audio file (`.mp3`, `.flac`, etc.).
 
 ---
 
 ## ✨ Features
 
-- ⚡ **Fast lyrics fetching** via Lyrics.ovh
-- 🔁 **Automatic fallback** to letras.com web scraping
-- 📄 **Writes lyrics** to a `.lrc` file beside the `.mp3`
-- 🧠 **Smart slug generation** for building letras.com URLs
-- 🌐 **Blocking HTTP requests** — ideal for synchronous tools or CLIs
-- 🔍 **Precise HTML parsing** using [`scraper`](https://docs.rs/scraper)
-- 🧩 **Trait-based architecture** for multiple backend implementations
-- 🧪 **Real integration tests** (no mocks!)
+- ⚡ **Fast lyrics fetching** via [LRCLib](https://lrclib.net) API
+- 📄 **Writes lyrics** to a `.lrc` file beside the input song
+- 🔁 **Fallback handling** for tracks with slight duration mismatches
+- 🎤 **Karaoke mode**: get synced `.lrc` lyrics when available
+- 🌐 **Blocking HTTP requests** — ideal for CLI and scripts
+- 🧩 **Trait-based architecture** for future backend extensions
+- 🧪 **Real integration tests**
 - 📦 Usable as a binary or library
-- 🐳 Docker image support for easy builds
+- 🐳 Docker image support for easy builds and usage
 
 ---
 
@@ -33,13 +40,19 @@ cargo build --release
 
 ## 🚀 Usage (CLI)
 
-Once compiled, you can run the binary with an `.mp3` file as an argument:
+Once compiled, run it with an `.mp3` or `.flac` file:
 
 ```bash
 ./getlyrics "/absolute/path/to/song.mp3"
 ```
 
-It will extract the metadata (artist/title), attempt to fetch the lyrics, and save them into a `.lrc` file in the same directory:
+Use the `-k` or `--karaoke` flag to request synced lyrics (if available):
+
+```bash
+./getlyrics --karaoke "/absolute/path/to/song.mp3"
+```
+
+This will extract metadata, fetch lyrics from LRCLib, and save the result to:
 
 ```bash
 /absolute/path/to/song.lrc
@@ -49,15 +62,10 @@ It will extract the metadata (artist/title), attempt to fetch the lyrics, and sa
 
 ### 🔁 Batch Usage
 
-To recursively search for `.mp3` files and fetch lyrics for each:
+To recursively fetch lyrics for all `.mp3` or `.flac` files:
 
 ```bash
 find . -type f -name '*.mp3' -exec ./getlyrics "$(pwd)/{}" \;
-```
-
-To recursively search for `.flac` files and fetch lyrics for each:
-
-```bash
 find . -type f -name '*.flac' -exec ./getlyrics "$(pwd)/{}" \;
 ```
 
@@ -65,19 +73,25 @@ find . -type f -name '*.flac' -exec ./getlyrics "$(pwd)/{}" \;
 
 ## 🐳 Docker Support
 
-You can build the Docker image locally:
+The latest version is already available on Docker Hub:
 
 ```bash
-docker build -t beruto/getlyrics:1 .
+docker pull beruto/getlyrics:2
 ```
 
-Once built, use it like this:
+Use it like this:
 
 ```bash
-docker run --rm -v "$(pwd)":/music beruto/getlyrics:1 /music/song.mp3
+docker run --rm -v "$(pwd)":/music beruto/getlyrics:2 /music/song.mp3
 ```
 
-> Replace `/music/song.mp3` with the absolute path inside the mounted volume.
+To enable synced lyrics (karaoke mode):
+
+```bash
+docker run --rm -v "$(pwd)":/music beruto/getlyrics:2 --karaoke /music/song.mp3
+```
+
+> Replace `/music/song.mp3` with the correct path inside the mounted volume.
 
 ---
 
@@ -89,18 +103,15 @@ Run real-world integration tests:
 cargo test -- --nocapture
 ```
 
-> These tests make actual HTTP requests to Lyrics.ovh and letras.com.
+> These tests make actual HTTP requests to LRCLib.
 
 ---
-
 
 ## 🛠 Technologies Used
 
 - [Rust](https://www.rust-lang.org/)
 - [reqwest](https://docs.rs/reqwest/)
-- [scraper](https://docs.rs/scraper/)
-- [Lyrics.ovh API](https://lyricsovh.docs.apiary.io)
-- [letras.com](https://www.letras.com)
+- [LRCLib](https://lrclib.net) – open lyrics API
 
 ---
 
@@ -112,4 +123,4 @@ MIT License — see [`LICENSE`](./LICENSE) for details.
 
 ## 🤝 Contributing
 
-Issues and PRs are welcome! If you have an idea for another fallback provider (e.g., Genius, Musixmatch), open a discussion or send a PR.
+PRs and issues are welcome! Have an idea for a new lyrics provider or format? Open an issue or fork and contribute.
