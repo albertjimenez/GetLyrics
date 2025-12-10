@@ -6,6 +6,8 @@
 A fast, reliable, and extensible Rust-based lyrics fetcher.
 
 ✨ **New in latest version:**
+- 📂 Directory support — process a folder of songsls
+- 🔁 Optional recursion — --recursive to scan deeper than 1 level
 - ❌ **No more web scraping** – cleaner, more stable code.
 - 📉 **Smaller binary size** due to removal of HTML parser and scraping logic.
 - 🎤 **New `--karaoke` mode** to fetch synced lyrics when available.
@@ -19,6 +21,8 @@ A fast, reliable, and extensible Rust-based lyrics fetcher.
 - ⚡ **Fast lyrics fetching** via [LRCLib](https://lrclib.net) API
 - 📄 **Writes lyrics** to a `.lrc` file beside the input song
 - 🔁 **Fallback handling** for tracks with slight duration mismatches
+- 📂 Process a single file or a full directory 
+- 🔁 Optional recursive scan
 - 🎤 **Karaoke mode**: get synced `.lrc` lyrics when available
 - 🌐 **Blocking HTTP requests** — ideal for CLI and scripts
 - 🧩 **Trait-based architecture** for future backend extensions
@@ -60,35 +64,50 @@ This will extract metadata, fetch lyrics from LRCLib, and save the result to:
 
 ---
 
-### 🔁 Batch Usage
-
-To recursively fetch lyrics for all `.mp3` or `.flac` files:
-
+### 📂 Directory Usage
+#### 📁 Process a folder (1 level only — default)
 ```bash
-find . -type f -name '*.mp3' -exec ./getlyrics "$(pwd)/{}" \;
-find . -type f -name '*.flac' -exec ./getlyrics "$(pwd)/{}" \;
+./getlyrics "/path/to/music_folder"
 ```
 
+This processes all supported audio formats (mp3, flac) inside the folder but not subfolders.
+
+#### 🔁 Recursive scan of all subfolders
+```bash
+./getlyrics --recursive "/path/to/music_folder"
+```
+
+or shorter:
+
+```bash
+./getlyrics -r "/path/to/music_folder"
+```
+Combine with karaoke:
+
+```bash
+./getlyrics -r -k "/path/to/music_folder"
+```
 ---
+
 
 ## 🐳 Docker Support
 
 The latest version is already available on Docker Hub:
 
 ```bash
-docker pull beruto/getlyrics:2
+docker pull beruto/getlyrics:0.1.1
 ```
 
 Use it like this:
 
 ```bash
-docker run --rm -v "$(pwd)":/music beruto/getlyrics:2 /music/song.mp3
+docker run --rm -v "$(pwd)":/music beruto/getlyrics:0.1.1 /music/song.mp3
 ```
 
 To enable synced lyrics (karaoke mode):
 
 ```bash
-docker run --rm -v "$(pwd)":/music beruto/getlyrics:2 --karaoke /music/song.mp3
+docker run --rm -v "$(pwd)":/music beruto/getlyrics:0.1.1 --karaoke /music/song.mp3
 ```
 
 > Replace `/music/song.mp3` with the correct path inside the mounted volume.
