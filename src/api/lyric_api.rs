@@ -27,13 +27,15 @@ impl LyricApi {
         lyrics.trim().to_string()
     }
     pub fn new() -> Self {
-        return LyricApi {};
+        LyricApi {}
     }
 }
 impl LyricIface for LyricApi {
     fn fetch_lyrics(&self, song_metadata: &SongMetadata) -> Result<Lyric, String> {
         let url = format(format_args!("https://api.lyrics.ovh/v1/{}/{}", &song_metadata.artist, &song_metadata.title));
-        let response = reqwest::blocking::get(url).unwrap();
+        let response = reqwest::blocking::get(&url)
+            .map_err(|e| format!("Network request failed: {}", e))?;
+
         if !response.status().is_success() {
             return Err("Lyric not found with LyricsAPI".to_owned());
         } else {
