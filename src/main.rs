@@ -5,17 +5,12 @@ use std::path::Path;
 use env_logger::{Builder, Env};
 use log::{error, info};
 
-use crate::api::lrclib_api::LrcLibAPI;
-use crate::api::lyric_api::LyricApi;
-use crate::metadata::metadata_extractor::MetadataExtractor;
-use crate::model::data_model::{Lyric, Song, Writer};
-use crate::traits::traits::LyricIface;
-
-pub mod model;
-mod api;
-mod metadata;
-mod writer;
-mod traits;
+use GetLyrics::api::lrclib_api::LrcLibAPI;
+use GetLyrics::api::lyric_api::LyricApi;
+use GetLyrics::hasher::file_hash_helper::FileHashHelper;
+use GetLyrics::metadata::metadata_extractor::MetadataExtractor;
+use GetLyrics::model::data_model::{Lyric, Song, Writer};
+use GetLyrics::traits::traits::LyricIface;
 
 fn main() {
     let env = Env::new().filter_or("RUST_LOG", "info");
@@ -26,6 +21,8 @@ fn main() {
     if args.len() < 2 {
         panic!("Usage: GetLyrics [-r|--recursive] [-k|--karaoke] <file_or_folder>");
     }
+    let mut hasher = FileHashHelper::new().expect("Failed to init hashing");
+
 
     let mut karaoke = false;
     let mut recursive = false;
@@ -46,15 +43,15 @@ fn main() {
     let path_obj = Path::new(&path);
 
     if path_obj.is_dir() {
-        process_directory(path_obj, karaoke, recursive);
+        process_directory(path_obj, karaoke, recursive, &mut hasher);
     } else if path_obj.is_file() {
-        process_single_file(path_obj, karaoke);
+        process_single_file(path_obj, karaoke, &mut hasher);
     } else {
         panic!("Invalid path: {}", path);
     }
 }
 
-fn process_directory(dir: &Path, karaoke: bool, recursive: bool) {
+fn process_directory(dir: &Path, karaoke: bool, recursive: bool, hasher: &mut FileHashHelper) {
     info!("Scanning directory: {}", dir.display());
 
     let audio_exts = ["mp3", "flac"];
@@ -64,24 +61,37 @@ fn process_directory(dir: &Path, karaoke: bool, recursive: bool) {
     for entry in entries {
         if let Ok(entry) = entry {
             let path = entry.path();
-
             if path.is_dir() {
                 if recursive {
-                    process_directory(&path, karaoke, recursive);
+                    process_directory(&path, karaoke, recursive, hasher);
                 }
                 continue;
             }
 
             if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
                 if audio_exts.contains(&ext.to_lowercase().as_str()) {
-                    process_single_file(&path, karaoke);
+                    process_single_file(&path, karaoke, hasher);
                 }
             }
         }
     }
 }
 
-fn process_single_file(path: &Path, karaoke: bool) {
+fn process_single_file(path: &Path, karaoke: bool, hasher: &mut FileHashHelper) {
+
+
+    // --- NEW: skip if already processed ---
+    match hasher.should_process(path) {
+        Ok(false) => {
+            info!("Skipping already processed file: {}", path.display());
+            return;
+        }
+        Err(e) => {
+            error!("Hashing error for {}: {}", path.display(), e);
+            return;
+        }
+        _ => {} // Ok(true) → continue
+    }
     let file_path = path.to_str().unwrap();
 
     let song = match Song::new(file_path) {

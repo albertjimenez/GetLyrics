@@ -114,6 +114,33 @@ docker run --rm -v "$(pwd)":/music beruto/getlyrics:0.1.1 --karaoke /music/song.
 
 ---
 
+
+
+## 🔐 File Hashing Support
+
+This update introduces **content-based hashing** for all processed files using **SHA-256**.  
+The goal is to provide a reliable and deterministic way to detect changes, deduplicate work, and ensure integrity across job executions.
+
+
+### 🚀 What’s New
+
+- Every file now gets a **SHA-256 hash** generated from its raw bytes.
+- Hash comparison is now used to decide whether a file has changed between runs.
+
+
+
+### 📝 Example
+
+```rust
+let hash_helper = FileHashHelper::new();
+let hash = hash_helper.hash_file(&path)?;
+
+// Example: "3fae76b79e531f859bd8cb7e3250e78d637d6ea968a82941e78c0a1ec2c958ef"
+println!("SHA-256: {}", hash);
+```
+
+---
+
 ## 🧪 Tests
 
 Run real-world integration tests:
