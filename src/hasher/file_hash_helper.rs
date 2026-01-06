@@ -90,7 +90,7 @@ mod test_file_hash_helper {
     /// Build a FileHashHelper with a temporary hash store path.
     /// This avoids interfering with the real ~/.getlyrics folder.
     fn make_test_helper(tmp_dir: &Path) -> Result<FileHashHelper> {
-        let helper = FileHashHelper::new()?;
+        let _helper = FileHashHelper::new()?;
 
         // Override the internal store path for testing:
         let mut store = tmp_dir.to_path_buf();
@@ -101,7 +101,7 @@ mod test_file_hash_helper {
         // Rebuild helper with the overridden path
         Ok(FileHashHelper {
             store_path: store,
-            ..helper
+            .._helper
         })
     }
 
