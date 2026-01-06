@@ -1,7 +1,7 @@
 use std::env;
 use std::fs;
 use std::path::Path;
-
+use std::process::exit;
 use env_logger::{Builder, Env};
 use log::{error, info};
 
@@ -19,7 +19,8 @@ fn main() {
     let args: Vec<String> = env::args().collect();
 
     if args.len() < 2 {
-        panic!("Usage: GetLyrics [-r|--recursive] [-k|--karaoke] <file_or_folder>");
+        error!("Usage: GetLyrics [-r|--recursive] [-k|--karaoke] <file_or_folder>");
+        exit(1);
     }
     let mut hasher = FileHashHelper::new().expect("Failed to init hashing");
 
