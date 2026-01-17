@@ -11,6 +11,7 @@ A fast, reliable, and extensible Rust-based lyrics fetcher.
 - ❌ **No more web scraping** – cleaner, more stable code.
 - 📉 **Smaller binary size** due to removal of HTML parser and scraping logic.
 - 🎤 **New `--karaoke` mode** to fetch synced lyrics when available.
+- 💪🏻 **New `-f` or `--force`** to redownload an already computed lyric.
 
 📝 After fetching the lyrics, the tool writes them to a `.lrc` file placed next to the input audio file (`.mp3`, `.flac`, etc.).
 
@@ -27,6 +28,7 @@ A fast, reliable, and extensible Rust-based lyrics fetcher.
 - 🌐 **Blocking HTTP requests** — ideal for CLI and scripts
 - 🧩 **Trait-based architecture** for future backend extensions
 - 🧪 **Real integration tests**
+- 💪🏻**Force creation** to force redownload a lyric that may have not been found in the past
 - 📦 Usable as a binary or library
 - 🐳 Docker image support for easy builds and usage
 
