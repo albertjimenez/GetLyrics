@@ -7,10 +7,11 @@ use log::{error, info};
 
 use GetLyrics::api::lrclib_api::LrcLibAPI;
 use GetLyrics::api::lyric_api::LyricApi;
+use GetLyrics::hasher::dummy_hasher::DummyHasher;
 use GetLyrics::hasher::file_hash_helper::FileHashHelper;
 use GetLyrics::metadata::metadata_extractor::MetadataExtractor;
 use GetLyrics::model::data_model::{Lyric, Song, Writer};
-use GetLyrics::traits::traits::LyricIface;
+use GetLyrics::traits::traits::{LyricIface, ProcessPolicy};
 
 fn main() {
     let env = Env::new().filter_or("RUST_LOG", "info");
@@ -19,29 +20,36 @@ fn main() {
     let args: Vec<String> = env::args().collect();
 
     if args.len() < 2 {
-        error!("Usage: GetLyrics [-r|--recursive] [-k|--karaoke] <file_or_folder>");
+        error!("Usage: GetLyrics [-r|--recursive] [-k|--karaoke] [-f|--force] <file_or_folder>");
         exit(1);
     }
-    let mut hasher = FileHashHelper::new().expect("Failed to init hashing");
+    let mut hasher = FileHashHelper::new_with_trait().expect("Failed to create file hasher");
 
 
     let mut karaoke = false;
     let mut recursive = false;
+    let mut force_scan = false;
     let mut path: Option<String> = None;
 
     for arg in &args[1..] {
         match arg.as_str() {
             "-k" | "--karaoke" => karaoke = true,
             "-r" | "--recursive" => recursive = true,
+            "-f" | "--force" => force_scan = true,
             _ => path = Some(arg.clone()),
         }
     }
 
     let Some(path) = path else {
-        panic!("Usage: GetLyrics [-r|--recursive] [-k|--karaoke] <file_or_folder>");
+        panic!("Usage: GetLyrics [-r|--recursive] [-k|--karaoke] [-f|--force] <file_or_folder>");
     };
 
     let path_obj = Path::new(&path);
+
+    if force_scan {
+        info!("Running force scan.");
+        hasher = DummyHasher::new();
+    }
 
     if path_obj.is_dir() {
         process_directory(path_obj, karaoke, recursive, &mut hasher);
@@ -52,7 +60,7 @@ fn main() {
     }
 }
 
-fn process_directory(dir: &Path, karaoke: bool, recursive: bool, hasher: &mut FileHashHelper) {
+fn process_directory(dir: &Path, karaoke: bool, recursive: bool, hasher: &mut Box<dyn ProcessPolicy>) {
     info!("Scanning directory: {}", dir.display());
 
     let audio_exts = ["mp3", "flac"];
@@ -78,7 +86,7 @@ fn process_directory(dir: &Path, karaoke: bool, recursive: bool, hasher: &mut Fi
     }
 }
 
-fn process_single_file(path: &Path, karaoke: bool, hasher: &mut FileHashHelper) {
+fn process_single_file(path: &Path, karaoke: bool, hasher: &mut Box<dyn ProcessPolicy>) {
 
 
     // --- NEW: skip if already processed ---

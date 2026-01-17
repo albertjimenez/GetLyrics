@@ -1,7 +1,12 @@
+use crate::traits::traits::ProcessPolicy;
 use anyhow::{Context, Result};
 use dirs::home_dir;
 use sha2::{Digest, Sha256};
-use std::{fs, io::{self, BufRead, Write}, path::{Path, PathBuf}};
+use std::{
+    fs,
+    io::{self, BufRead, Write},
+    path::{Path, PathBuf},
+};
 
 pub struct FileHashHelper {
     store_path: PathBuf,
@@ -13,25 +18,27 @@ impl FileHashHelper {
         dir.push(".getlyrics");
 
         if !dir.exists() {
-            fs::create_dir_all(&dir)
-                .context("Failed to create ~/.getlyrics directory")?;
+            fs::create_dir_all(&dir).context("Failed to create ~/.getlyrics directory")?;
         }
 
         let mut store_path = dir.clone();
         store_path.push("processed_hashes.txt");
 
         if !store_path.exists() {
-            fs::File::create(&store_path)
-                .context("Failed to create hash store file")?;
+            fs::File::create(&store_path).context("Failed to create hash store file")?;
         }
 
         Ok(Self { store_path })
     }
 
+    pub fn new_with_trait() -> Result<Box<dyn ProcessPolicy>> {
+        Ok(Box::new(Self::new()?))
+    }
+
     /// Compute SHA-256 of any file.
-    pub fn hash_file(&self, path: &Path) -> Result<String> {
-        let mut file = fs::File::open(path)
-            .with_context(|| format!("Failed to open file: {:?}", path))?;
+    fn hash_file(&self, path: &Path) -> Result<String> {
+        let mut file =
+            fs::File::open(path).with_context(|| format!("Failed to open file: {:?}", path))?;
 
         let mut hasher = Sha256::new();
         io::copy(&mut file, &mut hasher)?;
@@ -41,7 +48,7 @@ impl FileHashHelper {
     }
 
     /// Check if the hash exists in the store.
-    pub fn has_hash(&self, hash: &str) -> Result<bool> {
+    fn has_hash(&self, hash: &str) -> Result<bool> {
         let file = fs::File::open(&self.store_path)?;
         let reader = io::BufReader::new(file);
 
@@ -56,17 +63,17 @@ impl FileHashHelper {
     }
 
     /// Append new hash to the store.
-    pub fn store_hash(&self, hash: &str) -> Result<()> {
-        let mut file = fs::OpenOptions::new()
-            .append(true)
-            .open(&self.store_path)?;
+    fn store_hash(&self, hash: &str) -> Result<()> {
+        let mut file = fs::OpenOptions::new().append(true).open(&self.store_path)?;
 
         writeln!(file, "{}", hash)?;
         Ok(())
     }
+}
 
+impl ProcessPolicy for FileHashHelper {
     /// High-level helper: check + optionally store.
-    pub fn should_process(&self, path: &Path) -> Result<bool> {
+    fn should_process(&self, path: &Path) -> Result<bool> {
         let hash = self.hash_file(path)?;
 
         if self.has_hash(&hash)? {
@@ -78,15 +85,17 @@ impl FileHashHelper {
     }
 }
 
-
 #[cfg(test)]
 mod test_file_hash_helper {
     use crate::hasher::file_hash_helper::FileHashHelper;
+    use crate::traits::traits::ProcessPolicy;
+    use crate::hasher::dummy_hasher::DummyHasher;
     use anyhow::Result;
     use std::{
         fs,
         path::{Path, PathBuf},
     };
+
     /// Build a FileHashHelper with a temporary hash store path.
     /// This avoids interfering with the real ~/.getlyrics folder.
     fn make_test_helper(tmp_dir: &Path) -> Result<FileHashHelper> {
@@ -103,6 +112,10 @@ mod test_file_hash_helper {
             store_path: store,
             .._helper
         })
+    }
+
+    fn make_test_helper_for_trait(tmp_dir: &Path) -> Result<impl ProcessPolicy> {
+        make_test_helper(tmp_dir)
     }
 
     #[test]
@@ -135,7 +148,10 @@ mod test_file_hash_helper {
         helper.store_hash(fake_hash)?;
 
         // Now it must exist
-        assert!(helper.has_hash(fake_hash)?, "Hash should exist after storing");
+        assert!(
+            helper.has_hash(fake_hash)?,
+            "Hash should exist after storing"
+        );
 
         Ok(())
     }
@@ -147,7 +163,7 @@ mod test_file_hash_helper {
         assert!(mp3_path.exists(), "MP3 must exist");
 
         let tmp_dir = tempfile::tempdir()?;
-        let helper = make_test_helper(tmp_dir.path())?;
+        let helper = make_test_helper_for_trait(tmp_dir.path())?;
 
         // First call should process the file
         let first = helper.should_process(&mp3_path)?;
@@ -155,7 +171,10 @@ mod test_file_hash_helper {
 
         // Second call should skip the file
         let second = helper.should_process(&mp3_path)?;
-        assert!(!second, "Second call should return false — already processed");
+        assert!(
+            !second,
+            "Second call should return false — already processed"
+        );
 
         Ok(())
     }
@@ -170,6 +189,45 @@ mod test_file_hash_helper {
             helper.store_path.exists(),
             "Hash store file should exist inside tmp_dir"
         );
+
+        Ok(())
+    }
+
+
+    fn make_real_policy(tmp_dir: &Path) -> Result<Box<dyn ProcessPolicy>> {
+        let _helper = FileHashHelper::new()?;
+
+        let mut store = tmp_dir.to_path_buf();
+        store.push("test_hashes.txt");
+        fs::File::create(&store)?;
+
+        Ok(Box::new(FileHashHelper {
+            store_path: store,
+            .._helper
+        }))
+    }
+
+    #[test]
+    fn force_policy_overrides_real_policy() -> Result<()> {
+        let mp3_path = PathBuf::from("test_resources/benny_blanco-roses.mp3");
+        assert!(mp3_path.exists());
+
+        let tmp_dir = tempfile::tempdir()?;
+
+        let mut policy = make_real_policy(tmp_dir.path())?;
+
+        // First real run → process
+        assert!(policy.should_process(&mp3_path)?);
+
+        // Second real run → skip
+        assert!(!policy.should_process(&mp3_path)?);
+
+        // Switch to force mode
+        policy = DummyHasher::new();
+
+        // Now it must always process
+        assert!(policy.should_process(&mp3_path)?);
+        assert!(policy.should_process(&mp3_path)?);
 
         Ok(())
     }
