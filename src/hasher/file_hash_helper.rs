@@ -5,14 +5,21 @@ use sha2::{Digest, Sha256};
 use std::{
     fs,
     io::{self, BufRead, Write},
-    path::{Path, PathBuf},
+    path::{Path},
 };
+use std::collections::HashSet;
+use std::fs::{File, OpenOptions};
+use std::io::BufReader;
+use std::sync::{Arc, Mutex};
 
 pub struct FileHashHelper {
-    store_path: PathBuf,
+    hashes: Mutex<HashSet<String>>,
+    store_file: Mutex<File>, // adding a mutex to handle rayon parallelism
 }
 
 impl FileHashHelper {
+
+    const FILENAME: &'static str = "processed_hashes.txt";
     pub fn new() -> Result<Self> {
         let mut dir = home_dir().context("Could not resolve home directory")?;
         dir.push(".getlyrics");
@@ -22,17 +29,32 @@ impl FileHashHelper {
         }
 
         let mut store_path = dir.clone();
-        store_path.push("processed_hashes.txt");
+        store_path.push(FileHashHelper::FILENAME);
 
         if !store_path.exists() {
             fs::File::create(&store_path).context("Failed to create hash store file")?;
         }
+        let file = File::open(&store_path)?;
+        let reader = BufReader::new(file);
+        let mut set = HashSet::new();
 
-        Ok(Self { store_path })
+        for line in reader.lines().flatten() {
+            set.insert(line);
+        }
+
+        // 🔹 Open file in append mode for future writes
+        let store_file = OpenOptions::new()
+            .append(true)
+            .open(&store_path)?;
+
+        Ok(Self {
+            hashes: Mutex::new(set),
+            store_file: Mutex::new(store_file),
+        })
     }
 
-    pub fn new_with_trait() -> Result<Box<dyn ProcessPolicy>> {
-        Ok(Box::new(Self::new()?))
+    pub fn new_with_trait() -> Result<Arc<dyn ProcessPolicy>> {
+        Ok(Arc::new(Self::new()?))
     }
 
     /// Compute SHA-256 of any file.
@@ -46,189 +68,153 @@ impl FileHashHelper {
 
         Ok(hash)
     }
-
-    /// Check if the hash exists in the store.
-    fn has_hash(&self, hash: &str) -> Result<bool> {
-        let file = fs::File::open(&self.store_path)?;
-        let reader = io::BufReader::new(file);
-
-        for line in reader.lines() {
-            if let Ok(existing) = line {
-                if existing == hash {
-                    return Ok(true);
-                }
-            }
-        }
-        Ok(false)
-    }
-
-    /// Append new hash to the store.
-    fn store_hash(&self, hash: &str) -> Result<()> {
-        let mut file = fs::OpenOptions::new().append(true).open(&self.store_path)?;
-
-        writeln!(file, "{}", hash)?;
-        Ok(())
-    }
 }
 
 impl ProcessPolicy for FileHashHelper {
     /// High-level helper: check + optionally store.
     fn should_process(&self, path: &Path) -> Result<bool> {
         let hash = self.hash_file(path)?;
-
-        if self.has_hash(&hash)? {
-            Ok(false)
-        } else {
-            self.store_hash(&hash)?;
-            Ok(true)
+        let mut set = self.hashes.lock().unwrap();
+        if set.contains(&hash) {
+            return Ok(false);
         }
+        set.insert(hash.clone());
+        drop(set); // release lock ASAP
+
+        // Append to file (separate lock)
+        let mut file = self.store_file.lock().unwrap();
+        writeln!(file, "{}", hash)?;
+
+        Ok(true)
+    }
+}
+
+
+#[cfg(test)]
+impl FileHashHelper {
+    pub fn new_with_path(store_path: std::path::PathBuf) -> anyhow::Result<Self> {
+        use std::collections::HashSet;
+        use std::fs::{File, OpenOptions};
+        use std::io::{BufRead, BufReader};
+        use std::sync::Mutex;
+
+        if !store_path.exists() {
+            File::create(&store_path)?;
+        }
+
+        let reader = BufReader::new(File::open(&store_path)?);
+        let mut set = HashSet::new();
+        for line in reader.lines().flatten() {
+            set.insert(line);
+        }
+
+        let file = OpenOptions::new().append(true).open(&store_path)?;
+
+        Ok(Self {
+            hashes: Mutex::new(set),
+            store_file: Mutex::new(file),
+        })
     }
 }
 
 #[cfg(test)]
 mod test_file_hash_helper {
-    use crate::hasher::file_hash_helper::FileHashHelper;
-    use crate::traits::traits::ProcessPolicy;
+    use super::*;
     use crate::hasher::dummy_hasher::DummyHasher;
+    use crate::traits::traits::ProcessPolicy;
     use anyhow::Result;
-    use std::{
-        fs,
-        path::{Path, PathBuf},
-    };
+    use std::path::PathBuf;
+    use std::sync::Arc;
 
-    /// Build a FileHashHelper with a temporary hash store path.
-    /// This avoids interfering with the real ~/.getlyrics folder.
+    const DEFAULT_SONG_NAME: &str = "test_resources/benny_blanco-roses.mp3";
+
     fn make_test_helper(tmp_dir: &Path) -> Result<FileHashHelper> {
-        let _helper = FileHashHelper::new()?;
-
-        // Override the internal store path for testing:
         let mut store = tmp_dir.to_path_buf();
-        store.push("test_hashes.txt");
-
-        fs::File::create(&store).expect("failed to create temporary test hash store");
-
-        // Rebuild helper with the overridden path
-        Ok(FileHashHelper {
-            store_path: store,
-            .._helper
-        })
-    }
-
-    fn make_test_helper_for_trait(tmp_dir: &Path) -> Result<impl ProcessPolicy> {
-        make_test_helper(tmp_dir)
+        store.push(FileHashHelper::FILENAME);
+        FileHashHelper::new_with_path(store)
     }
 
     #[test]
     fn test_hash_file_mp3() -> Result<()> {
-        // Path to the MP3 located outside `src/`:
-        let mp3_path = PathBuf::from("test_resources/benny_blanco-roses.mp3");
-        assert!(mp3_path.exists(), "MP3 file should exist in project root");
+        let mp3_path = PathBuf::from(DEFAULT_SONG_NAME);
+        assert!(mp3_path.exists());
 
         let tmp_dir = tempfile::tempdir()?;
         let helper = make_test_helper(tmp_dir.path())?;
 
         let hash = helper.hash_file(&mp3_path)?;
-        assert!(!hash.is_empty(), "Hash should not be empty");
-        assert_eq!(hash.len(), 64, "SHA-256 should be 64 hex chars");
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_store_and_check_hash() -> Result<()> {
-        let tmp_dir = tempfile::tempdir()?;
-        let helper = make_test_helper(tmp_dir.path())?;
-
-        let fake_hash = "abc123deadbeef";
-
-        // Initially it should not exist
-        assert!(!helper.has_hash(fake_hash)?, "Hash should not exist yet");
-
-        // Store the hash
-        helper.store_hash(fake_hash)?;
-
-        // Now it must exist
-        assert!(
-            helper.has_hash(fake_hash)?,
-            "Hash should exist after storing"
-        );
+        assert_eq!(hash.len(), 64);
 
         Ok(())
     }
 
     #[test]
     fn test_should_process_logic() -> Result<()> {
-        let mp3_path = PathBuf::from("test_resources/benny_blanco-roses.mp3");
-
-        assert!(mp3_path.exists(), "MP3 must exist");
-
+        let mp3_path = PathBuf::from(DEFAULT_SONG_NAME);
         let tmp_dir = tempfile::tempdir()?;
-        let helper = make_test_helper_for_trait(tmp_dir.path())?;
+        let helper = make_test_helper(tmp_dir.path())?;
 
-        // First call should process the file
-        let first = helper.should_process(&mp3_path)?;
-        assert!(first, "First call should return true — not processed yet");
-
-        // Second call should skip the file
-        let second = helper.should_process(&mp3_path)?;
-        assert!(
-            !second,
-            "Second call should return false — already processed"
-        );
+        assert!(helper.should_process(&mp3_path)?);
+        assert!(!helper.should_process(&mp3_path)?);
 
         Ok(())
     }
 
     #[test]
-    fn test_store_file_created() -> Result<()> {
+    fn test_persistence_between_instances() -> Result<()> {
+        let mp3_path = PathBuf::from(DEFAULT_SONG_NAME);
         let tmp_dir = tempfile::tempdir()?;
-        let helper = make_test_helper(tmp_dir.path())?;
 
-        // The helper should have created a test hash store file
-        assert!(
-            helper.store_path.exists(),
-            "Hash store file should exist inside tmp_dir"
-        );
+        // First run → store hash
+        {
+            let helper = make_test_helper(tmp_dir.path())?;
+            assert!(helper.should_process(&mp3_path)?);
+        }
+
+        // Second instance should reload hashes from file
+        {
+            let helper = make_test_helper(tmp_dir.path())?;
+            assert!(!helper.should_process(&mp3_path)?);
+        }
 
         Ok(())
     }
 
+    #[test]
+    fn test_parallel_safety() -> Result<()> {
+        use rayon::prelude::*;
 
-    fn make_real_policy(tmp_dir: &Path) -> Result<Box<dyn ProcessPolicy>> {
-        let _helper = FileHashHelper::new()?;
+        let mp3_path = PathBuf::from(DEFAULT_SONG_NAME);
+        let tmp_dir = tempfile::tempdir()?;
+        let helper = Arc::new(make_test_helper(tmp_dir.path())?);
 
-        let mut store = tmp_dir.to_path_buf();
-        store.push("test_hashes.txt");
-        fs::File::create(&store)?;
+        let results: Vec<bool> = (0..10)
+            .into_par_iter()
+            .map(|_| helper.should_process(&mp3_path).unwrap())
+            .collect();
 
-        Ok(Box::new(FileHashHelper {
-            store_path: store,
-            .._helper
-        }))
+        // Only one thread should get true
+        assert_eq!(results.iter().filter(|&&r| r).count(), 1);
+
+        Ok(())
     }
 
     #[test]
     fn force_policy_overrides_real_policy() -> Result<()> {
-        let mp3_path = PathBuf::from("test_resources/benny_blanco-roses.mp3");
-        assert!(mp3_path.exists());
-
+        let mp3_path = PathBuf::from(DEFAULT_SONG_NAME);
         let tmp_dir = tempfile::tempdir()?;
 
-        let mut policy = make_real_policy(tmp_dir.path())?;
+        let real: Arc<dyn ProcessPolicy> = Arc::new(make_test_helper(tmp_dir.path())?);
 
-        // First real run → process
-        assert!(policy.should_process(&mp3_path)?);
+        assert!(real.should_process(&mp3_path)?);
+        assert!(!real.should_process(&mp3_path)?);
 
-        // Second real run → skip
-        assert!(!policy.should_process(&mp3_path)?);
+        let force: Arc<dyn ProcessPolicy> = DummyHasher::new();
 
-        // Switch to force mode
-        policy = DummyHasher::new();
-
-        // Now it must always process
-        assert!(policy.should_process(&mp3_path)?);
-        assert!(policy.should_process(&mp3_path)?);
+        assert!(force.should_process(&mp3_path)?);
+        assert!(force.should_process(&mp3_path)?);
 
         Ok(())
     }
 }
+

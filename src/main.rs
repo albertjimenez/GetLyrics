@@ -1,19 +1,26 @@
+use rayon::iter::ParallelIterator;
 use std::env;
-use std::fs;
 use std::path::Path;
 use std::process::exit;
+use std::sync::Arc;
 use env_logger::{Builder, Env};
-use log::{error, info};
-
+use log::{debug, error, info};
+use rayon::prelude::IntoParallelRefIterator;
+use rayon::ThreadPoolBuilder;
 use GetLyrics::api::lrclib_api::LrcLibAPI;
 use GetLyrics::api::lyric_api::LyricApi;
 use GetLyrics::hasher::dummy_hasher::DummyHasher;
 use GetLyrics::hasher::file_hash_helper::FileHashHelper;
 use GetLyrics::metadata::metadata_extractor::MetadataExtractor;
 use GetLyrics::model::data_model::{Lyric, Song, Writer};
+use GetLyrics::parallel_helper::parallel_helper::ParallelHelper;
 use GetLyrics::traits::traits::{LyricIface, ProcessPolicy};
 
 fn main() {
+    // limit API pressure requests
+    ThreadPoolBuilder::new().num_threads(6).build_global().unwrap();
+
+
     let env = Env::new().filter_or("RUST_LOG", "info");
     Builder::from_env(env).init();
 
@@ -23,7 +30,7 @@ fn main() {
         error!("Usage: GetLyrics [-r|--recursive] [-k|--karaoke] [-f|--force] <file_or_folder>");
         exit(1);
     }
-    let mut hasher = FileHashHelper::new_with_trait().expect("Failed to create file hasher");
+    let mut hasher: Arc<dyn ProcessPolicy> = FileHashHelper::new_with_trait().expect("Failed to create file hasher");
 
 
     let mut karaoke = false;
@@ -52,54 +59,38 @@ fn main() {
     }
 
     if path_obj.is_dir() {
-        process_directory(path_obj, karaoke, recursive, &mut hasher);
+        process_directory(path_obj, karaoke, recursive, hasher);
     } else if path_obj.is_file() {
-        process_single_file(path_obj, karaoke, &mut hasher);
+        process_single_file(path_obj, karaoke, hasher);
     } else {
         panic!("Invalid path: {}", path);
     }
 }
 
-fn process_directory(dir: &Path, karaoke: bool, recursive: bool, hasher: &mut Box<dyn ProcessPolicy>) {
+fn process_directory(dir: &Path, karaoke: bool, recursive: bool, hasher: Arc<dyn ProcessPolicy>) {
     info!("Scanning directory: {}", dir.display());
 
-    let audio_exts = ["mp3", "flac"];
+    let files = ParallelHelper::collect_audio_files(dir, recursive);
 
-    let entries = fs::read_dir(dir).expect("Cannot read directory");
-
-    for entry in entries {
-        if let Ok(entry) = entry {
-            let path = entry.path();
-            if path.is_dir() {
-                if recursive {
-                    process_directory(&path, karaoke, recursive, hasher);
-                }
-                continue;
-            }
-
-            if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-                if audio_exts.contains(&ext.to_lowercase().as_str()) {
-                    process_single_file(&path, karaoke, hasher);
-                }
-            }
-        }
-    }
+    files.par_iter().for_each(|path| {
+        process_single_file(path, karaoke, hasher.clone());
+    });
 }
 
-fn process_single_file(path: &Path, karaoke: bool, hasher: &mut Box<dyn ProcessPolicy>) {
+fn process_single_file(path: &Path, karaoke: bool, hasher: Arc<dyn ProcessPolicy>) {
 
 
     // --- NEW: skip if already processed ---
     match hasher.should_process(path) {
         Ok(false) => {
-            info!("Skipping already processed file: {}", path.display());
+            debug!("Skipping already processed file: {}", path.display());
             return;
         }
         Err(e) => {
             error!("Hashing error for {}: {}", path.display(), e);
             return;
         }
-        _ => {} // Ok(true) → continue
+        Ok(true) => {}
     }
     let file_path = path.to_str().unwrap();
 
