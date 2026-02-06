@@ -1,2 +1,4 @@
 .gitignore
 /target
+test_resources/*.lrc
+*.lrc

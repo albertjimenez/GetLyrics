@@ -6,7 +6,7 @@
 A fast, reliable, and extensible Rust-based lyrics fetcher.
 
 ✨ **New in latest version:**
-- 📂 Directory support — process a folder of songsls
+- 📂 Directory support — process a folder of songs
 - 🔁 Optional recursion — --recursive to scan deeper than 1 level
 - ❌ **No more web scraping** – cleaner, more stable code.
 - 📉 **Smaller binary size** due to removal of HTML parser and scraping logic.

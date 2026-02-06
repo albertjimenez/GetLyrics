@@ -38,9 +38,9 @@ impl LyricIface for LrcLibAPI {
             .build()
             .map_err(|e| format!("Failed to build HTTP client: {}", e))?;
 
-        let response = client.get(base_url)
+        let response = client
+            .get(base_url)
             .query(&params)
-
             .send()
             .map_err(|e| format!("Request error: {}", e))?;
 
@@ -51,13 +51,19 @@ impl LyricIface for LrcLibAPI {
                     .map_err(|e| format!("Failed to parse response JSON: {}", e))?;
                 let mut lyrics = data.plain_lyrics;
                 if data.synced_lyrics.is_none() && self.karaoke {
-                    warn!("Falling back to traditional lyric since no synced lyric was found for {}", &song_metadata.title);
+                    warn!(
+                        "Falling back to traditional lyric since no synced lyric was found for {}",
+                        &song_metadata.title
+                    );
                 }
                 if data.synced_lyrics.is_some() && self.karaoke {
                     lyrics = data.synced_lyrics.unwrap();
                 }
-                let lyric = Lyric { lyric: lyrics, song: song_metadata.song.to_owned() };
-                return Ok(lyric);
+                let lyric = Lyric {
+                    lyric: lyrics,
+                    song: song_metadata.song.to_owned(),
+                };
+                Ok(lyric)
             }
             404 => Err("Lyrics not found.".to_string()),
             code => Err(format!("Unexpected status code: {}", code)),

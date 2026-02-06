@@ -4,7 +4,9 @@ use std::path::{Path, PathBuf};
 
 use log::error;
 
-use crate::model::data_model::AudioExtensions::{AAC, AIFF, FLAC, M4A, MP3, OGG, UNKNOWN, WAV, WMA};
+use crate::model::data_model::AudioExtensions::{
+    AAC, AIFF, FLAC, M4A, MP3, OGG, UNKNOWN, WAV, WMA,
+};
 
 #[derive(Debug, Eq, PartialEq, PartialOrd, Ord, Clone, Hash)]
 pub struct Lyric {
@@ -28,11 +30,19 @@ impl Song {
         let filepath_as_path = filepath_as_path.to_owned();
         let filename = String::from(filepath_as_path.file_name().unwrap().to_str().unwrap());
 
-        return Some(Song { filename, extension, filepath: filepath_as_path });
+        Some(Song {
+            filename,
+            extension,
+            filepath: filepath_as_path,
+        })
     }
     pub fn empty() -> Song {
         let (filename, extension, filepath) = (String::new(), MP3, PathBuf::new());
-        return Song { filename, extension, filepath, };
+        Song {
+            filename,
+            extension,
+            filepath,
+        }
     }
     pub fn is_file(&self) -> bool {
         match self.filepath.try_exists() {
@@ -43,7 +53,13 @@ impl Song {
 }
 impl Display for Song {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "filename: {}, extension: {}, filepath: {}", self.filename, self.extension, self.filepath.to_str().unwrap_or(""))
+        write!(
+            f,
+            "filename: {}, extension: {}, filepath: {}",
+            self.filename,
+            self.extension,
+            self.filepath.to_str().unwrap_or("")
+        )
     }
 }
 #[derive(Debug)]
@@ -52,7 +68,7 @@ pub struct SongMetadata {
     pub artist: String,
     pub title: String,
     pub album_title: String,
-    pub duration: Option<u16>
+    pub duration: Option<u16>,
 }
 
 #[derive(Debug, Eq, PartialEq, PartialOrd, Ord, Copy, Clone, Hash)]
@@ -69,7 +85,7 @@ pub enum AudioExtensions {
 }
 impl AudioExtensions {
     pub(crate) fn get_extension(&self) -> &'static str {
-        return match &self {
+        match &self {
             MP3 => "mp3",
             OGG => "ogg",
             M4A => "m4a",
@@ -78,21 +94,25 @@ impl AudioExtensions {
             AIFF => "aiff",
             WMA => "wma",
             AAC => "aac",
-            UNKNOWN => "unknown"
-        };
+            UNKNOWN => "unknown",
+        }
     }
     fn get_extension_as_str(filepath: &Path) -> String {
         let cloned = filepath.to_owned();
-        let os_string = cloned.extension().unwrap_or(OsStr::new(UNKNOWN.get_extension())).to_ascii_lowercase();
-        return String::from(os_string.to_str().unwrap_or(""));
+        let os_string = cloned
+            .extension()
+            .unwrap_or(OsStr::new(UNKNOWN.get_extension()))
+            .to_ascii_lowercase();
+        String::from(os_string.to_str().unwrap_or(""))
     }
     pub fn get_extension_by_filepath(filepath: &Path) -> AudioExtensions {
         let extensions = vec![MP3, OGG, M4A, FLAC, WAV, AIFF, WMA, AAC];
         let current_extension = Self::get_extension_as_str(filepath);
-        let result = extensions.into_iter().find(|an_extension| {
-            current_extension.as_str() == an_extension.get_extension()
-        });
-        return result.unwrap_or_else(|| UNKNOWN);
+        let result = extensions
+            .into_iter()
+            .find(|an_extension| current_extension.as_str() == an_extension.get_extension());
+
+        result.unwrap_or_else(|| UNKNOWN)
     }
 }
 impl Display for AudioExtensions {
@@ -101,6 +121,4 @@ impl Display for AudioExtensions {
     }
 }
 
-pub struct Writer {}
-
-
+pub struct Writer;

@@ -4,3 +4,5 @@ pub mod metadata;
 pub mod writer;
 pub mod traits;
 pub mod hasher;
+
+pub mod parallel_helper;
