@@ -26,12 +26,12 @@ impl MetadataExtractor {
         let title = String::from(tag.title().unwrap_or(""));
         let artist = String::from(tag.artist().unwrap_or(""));
         let album_title = String::from(tag.album_title().unwrap_or(""));
-        if title == "" && artist == "" {
+        if title.is_empty() && artist.is_empty() {
             warn!("Artist or title is empty. Skipping song.");
             return None;
         }
         let duration = Self::get_duration(borrowed_song2).map_or(None, |seconds| Some(seconds));
-        return Some(SongMetadata { song: song.to_owned(), artist, title, album_title, duration });
+        Some(SongMetadata { song: song.to_owned(), artist, title, album_title, duration })
     }
     fn get_duration(song: Song) -> Result<u16, Error> {
         let file = File::open(song.filepath)?;
