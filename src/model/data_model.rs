@@ -106,13 +106,13 @@ impl AudioExtensions {
         String::from(os_string.to_str().unwrap_or(""))
     }
     pub fn get_extension_by_filepath(filepath: &Path) -> AudioExtensions {
-        let extensions = vec![MP3, OGG, M4A, FLAC, WAV, AIFF, WMA, AAC];
+        let extensions = [MP3, OGG, M4A, FLAC, WAV, AIFF, WMA, AAC];
         let current_extension = Self::get_extension_as_str(filepath);
         let result = extensions
             .into_iter()
             .find(|an_extension| current_extension.as_str() == an_extension.get_extension());
 
-        result.unwrap_or_else(|| UNKNOWN)
+        result.unwrap_or(UNKNOWN)
     }
 }
 impl Display for AudioExtensions {

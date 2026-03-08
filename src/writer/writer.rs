@@ -1,6 +1,6 @@
 use std::fs;
 use std::path::PathBuf;
-use log::{warn};
+use log::{error, warn};
 use crate::model::data_model::{Lyric, Writer};
 
 impl Writer {
@@ -20,7 +20,7 @@ impl Writer {
 
         // Write lyrics to the new file
         if let Err(e) = fs::write(&full_path, lyrics) {
-            eprintln!("Failed to write lyric file: {}", e);
+            error!("Failed to write lyric file: {}", e);
             return None;
         }
         Some(full_path)
