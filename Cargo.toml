@@ -14,12 +14,12 @@ reqwest = { version = "0.12.28", features = ["native-tls-vendored", "blocking", 
 log = { version = "0.4.29", features = [] }
 regex = "1.12.3"
 serde = { version = "1.0.228", features = ["derive"] }
-env_logger = "0.11.8"
+env_logger = "0.11.10"
 sha2 = "0.10.9"
-anyhow = "1.0.100"
+anyhow = "1.0.102"
 dirs = "6.0.0"
 rayon = "1.11.0"
 walkdir = "2.5.0"
 
 [dev-dependencies]
-tempfile = "3.24.0"
+tempfile = "3.27.0"
