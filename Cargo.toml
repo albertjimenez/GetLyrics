@@ -1,6 +1,6 @@
 [package]
 name = "GetLyrics"
-version = "0.3.0"
+version = "0.3.2"
 edition = "2024"
 
 [[bin]]
@@ -9,17 +9,18 @@ path = "src/main.rs"
 
 [dependencies]
 audiotags = "0.5.0"
-symphonia = { version = "0.5.5", features = ["mp3", "flac"] }
-reqwest = { version = "0.12.28", features = ["native-tls-vendored", "blocking", "json"] }
-log = { version = "0.4.29", features = [] }
-regex = "1.12.3"
+symphonia = { version = "0.6.0", features = ["mp3", "flac"] }
+reqwest = { version = "0.13.4", features = ["native-tls-vendored", "blocking", "json", "query"] }
+log = { version = "0.4.33", features = [] }
+regex = "1.13.0"
 serde = { version = "1.0.228", features = ["derive"] }
-env_logger = "0.11.10"
-sha2 = "0.10.9"
-anyhow = "1.0.102"
+env_logger = "0.11.11"
+sha2 = { version = "0.11.0" , features = []}
+anyhow = "1.0.103"
 dirs = "6.0.0"
-rayon = "1.11.0"
+rayon = "1.12.0"
 walkdir = "2.5.0"
+hex = "0.4.3"
 
 [dev-dependencies]
 tempfile = "3.27.0"

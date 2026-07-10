@@ -2,15 +2,16 @@ use crate::traits::traits::ProcessPolicy;
 use anyhow::{Context, Result};
 use dirs::home_dir;
 use sha2::{Digest, Sha256};
-use std::{
-    fs,
-    io::{self, BufRead, Write},
-    path::{Path},
-};
+
 use std::collections::HashSet;
 use std::fs::{File, OpenOptions};
-use std::io::BufReader;
+use std::io::{BufReader, Read};
 use std::sync::{Arc, Mutex};
+use std::{
+    fs,
+    io::{BufRead, Write},
+    path::Path,
+};
 
 pub struct FileHashHelper {
     hashes: Mutex<HashSet<String>>,
@@ -63,8 +64,15 @@ impl FileHashHelper {
             fs::File::open(path).with_context(|| format!("Failed to open file: {:?}", path))?;
 
         let mut hasher = Sha256::new();
-        io::copy(&mut file, &mut hasher)?;
-        let hash = format!("{:x}", hasher.finalize());
+        let mut buffer = [0; 8192];
+        loop {
+            let n = file.read(&mut buffer)?;
+            if n == 0 {
+                break;
+            }
+            hasher.update(&buffer[..n]);
+        }
+        let hash = hex::encode(hasher.finalize());
 
         Ok(hash)
     }

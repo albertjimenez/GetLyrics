@@ -94,22 +94,22 @@ Combine with karaoke:
 
 ## 🐳 Docker Support
 
-The latest version is already available on Docker Hub:
+The latest version is already available on Docker Hub with two flavours, `amd64` and `arm64`:
 
 ```bash
-docker pull beruto/getlyrics:0.2.3
+docker pull beruto/getlyrics:0.3.2-amd64
 ```
 
 Use it like this:
 
 ```bash
-docker run --rm -v "$(pwd)":/music beruto/getlyrics:0.2.3 /music/song.mp3
+docker run --rm -v "$(pwd)":/music beruto/getlyrics:0.3.2-amd64 /music/song.mp3
 ```
 
 To enable synced lyrics (karaoke mode):
 
 ```bash
-docker run --rm -v "$(pwd)":/music beruto/getlyrics:0.2.3 --karaoke /music/song.mp3
+docker run --rm -v "$(pwd)":/music beruto/getlyrics:0.3.2-amd64 --karaoke /music/song.mp3
 ```
 
 > Replace `/music/song.mp3` with the correct path inside the mounted volume.

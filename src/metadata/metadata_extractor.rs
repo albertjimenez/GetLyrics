@@ -3,9 +3,11 @@ use std::fs::File;
 use audiotags::Tag;
 use log::{error, warn};
 use symphonia::core::errors::Error;
+use symphonia::core::errors::Error::DecodeError;
 use symphonia::core::formats::FormatOptions;
 use symphonia::core::io::MediaSourceStream;
 use symphonia::core::meta::MetadataOptions;
+use symphonia::core::units::Timestamp;
 use symphonia::default::get_probe;
 
 use crate::model::data_model::{Song, SongMetadata};
@@ -36,30 +38,26 @@ impl MetadataExtractor {
     fn get_duration(song: Song) -> Result<u16, Error> {
         let file = File::open(song.filepath)?;
         let mss = MediaSourceStream::new(Box::new(file), Default::default());
-
-        let probed = get_probe().format(
+        let probed = get_probe().probe(
             &Default::default(),
             mss,
-            &FormatOptions::default(),
-            &MetadataOptions::default(),
+            FormatOptions::default(),
+            MetadataOptions::default(),
         )?;
-        let format = probed.format;
-        let track = format
+        let track = probed
             .tracks()
             .first()
-            .ok_or(Error::DecodeError("No audio tracks found"))?;
+            .ok_or(DecodeError("No audio tracks found"))?;
+        
+        let time_base = track
+            .time_base
+            .ok_or(DecodeError("Track timebase missing"))?;
 
-        let n_frames = track
-            .codec_params
-            .n_frames
-            .ok_or(Error::DecodeError("Frame count missing"))?;
-
-        let sample_rate = track
-            .codec_params
-            .sample_rate
-            .ok_or(Error::DecodeError("Sample rate missing"))?;
-
-        let seconds = (n_frames / sample_rate as u64) as u16;
+        let seconds = track
+            .duration
+            .and_then(|dur| time_base.calc_time(Timestamp::new(dur.get() as i64)))
+            .map(|time| time.as_secs() as u16)
+            .ok_or(DecodeError("Could not get the seconds"))?;
         Ok(seconds)
     }
 }

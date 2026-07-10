@@ -21,6 +21,7 @@ mod metadata_extractor_tests {
             let metadata = metadata.unwrap();
             assert_eq!("Benny Blanco", metadata.artist);
             assert_eq!("Roses", metadata.title);
+            assert_eq!(Some(223), metadata.duration)
         }
 
     }
