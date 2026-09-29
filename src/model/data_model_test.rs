@@ -1,8 +1,7 @@
-
 #[cfg(test)]
 mod data_model_tests {
-    use std::path::PathBuf;
     use crate::model::data_model::{AudioExtensions, Song};
+    use std::path::PathBuf;
 
     #[test]
     fn test_audio_extensions_get_extension() {
@@ -18,9 +17,18 @@ mod data_model_tests {
         let valid_flac = PathBuf::from("track.flac");
         let unknown_file = PathBuf::from("document.txt");
 
-        assert_eq!(AudioExtensions::get_extension_by_filepath(&valid_mp3), AudioExtensions::MP3);
-        assert_eq!(AudioExtensions::get_extension_by_filepath(&valid_flac), AudioExtensions::FLAC);
-        assert_eq!(AudioExtensions::get_extension_by_filepath(&unknown_file), AudioExtensions::UNKNOWN);
+        assert_eq!(
+            AudioExtensions::get_extension_by_filepath(&valid_mp3),
+            AudioExtensions::MP3
+        );
+        assert_eq!(
+            AudioExtensions::get_extension_by_filepath(&valid_flac),
+            AudioExtensions::FLAC
+        );
+        assert_eq!(
+            AudioExtensions::get_extension_by_filepath(&unknown_file),
+            AudioExtensions::UNKNOWN
+        );
     }
 
     #[test]

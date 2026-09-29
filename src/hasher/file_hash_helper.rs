@@ -19,7 +19,6 @@ pub struct FileHashHelper {
 }
 
 impl FileHashHelper {
-
     const FILENAME: &'static str = "processed_hashes.txt";
     pub fn new() -> Result<Self> {
         let mut dir = home_dir().context("Could not resolve home directory")?;
@@ -44,9 +43,7 @@ impl FileHashHelper {
         }
 
         // 🔹 Open file in append mode for future writes
-        let store_file = OpenOptions::new()
-            .append(true)
-            .open(&store_path)?;
+        let store_file = OpenOptions::new().append(true).open(&store_path)?;
 
         Ok(Self {
             hashes: Mutex::new(set),
@@ -96,7 +93,6 @@ impl ProcessPolicy for FileHashHelper {
         Ok(true)
     }
 }
-
 
 #[cfg(test)]
 impl FileHashHelper {
@@ -225,4 +221,3 @@ mod test_file_hash_helper {
         Ok(())
     }
 }
-

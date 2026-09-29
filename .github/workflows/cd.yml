@@ -1,0 +1,154 @@
+name: cd
+
+# Continuous delivery. Runs only on `v*` tags:
+#   1. re-runs the test gate,
+#   2. builds + publishes release binaries to the GitHub release,
+#   3. builds + pushes multi-arch images to Docker Hub.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test
+
+  release-binaries:
+    needs: test
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            builder: cargo
+            apt_pkgs: musl-tools
+            rustflags: ""
+            archive: targz
+            exe: ""
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-musl
+            builder: zigbuild
+            apt_pkgs: ""
+            rustflags: ""
+            archive: targz
+            exe: ""
+          - os: ubuntu-latest
+            target: x86_64-pc-windows-gnu
+            builder: cargo
+            apt_pkgs: mingw-w64
+            rustflags: "-C link-arg=-static"
+            archive: zip
+            exe: .exe
+          - os: macos-14
+            target: aarch64-apple-darwin
+            builder: cargo
+            apt_pkgs: ""
+            rustflags: ""
+            archive: targz
+            exe: ""
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install cross toolchain
+        if: matrix.apt_pkgs != ''
+        run: sudo apt-get update && sudo apt-get install -y ${{ matrix.apt_pkgs }}
+
+      - uses: mlugg/setup-zig@v2
+        if: matrix.builder == 'zigbuild'
+        with:
+          version: 0.15.1
+
+      - name: Install cargo-zigbuild
+        if: matrix.builder == 'zigbuild'
+        run: cargo install cargo-zigbuild --version 0.23.4 --locked
+
+      - name: Build
+        env:
+          RUSTFLAGS: ${{ matrix.rustflags }}
+        run: |
+          if [ "${{ matrix.builder }}" = "zigbuild" ]; then
+            cargo zigbuild --release --target ${{ matrix.target }}
+          else
+            cargo build --release --target ${{ matrix.target }}
+          fi
+
+      - name: List Windows DLL imports
+        if: matrix.target == 'x86_64-pc-windows-gnu'
+        run: x86_64-w64-mingw32-objdump -p "target/${{ matrix.target }}/release/getlyrics${{ matrix.exe }}" | grep "DLL Name"
+
+      - name: Package
+        shell: bash
+        run: |
+          STAGE=dist/getlyrics
+          mkdir -p "$STAGE"
+          cp "target/${{ matrix.target }}/release/getlyrics${{ matrix.exe }}" "$STAGE/"
+          cp README.md LICENSE "$STAGE/"
+          if [ "${{ matrix.archive }}" = "zip" ]; then
+            (cd dist && zip -r "../getlyrics-${{ matrix.target }}.zip" getlyrics)
+          else
+            tar -czf "getlyrics-${{ matrix.target }}.tar.gz" -C dist getlyrics
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: getlyrics-${{ matrix.target }}
+          path: getlyrics-${{ matrix.target }}.*
+
+  publish-release:
+    needs: release-binaries
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            getlyrics-*.tar.gz
+            getlyrics-*.zip
+          generate_release_notes: true
+
+  docker:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-qemu-action@v3
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ vars.DOCKERHUB_USERNAME }}/getlyrics:${{ github.ref_name }}
+            ${{ vars.DOCKERHUB_USERNAME }}/getlyrics:latest

@@ -1,8 +1,8 @@
-pub mod model;
 pub mod api;
-pub mod metadata;
-pub mod writer;
-pub mod traits;
 pub mod hasher;
+pub mod metadata;
+pub mod model;
+pub mod traits;
+pub mod writer;
 
 pub mod parallel_helper;

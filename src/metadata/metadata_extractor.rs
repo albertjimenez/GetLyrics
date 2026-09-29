@@ -33,7 +33,13 @@ impl MetadataExtractor {
             return None;
         }
         let duration = Self::get_duration(borrowed_song2).map_or(None, |seconds| Some(seconds));
-        Some(SongMetadata { song: song.to_owned(), artist, title, album_title, duration })
+        Some(SongMetadata {
+            song: song.to_owned(),
+            artist,
+            title,
+            album_title,
+            duration,
+        })
     }
     fn get_duration(song: Song) -> Result<u16, Error> {
         let file = File::open(song.filepath)?;
@@ -48,7 +54,7 @@ impl MetadataExtractor {
             .tracks()
             .first()
             .ok_or(DecodeError("No audio tracks found"))?;
-        
+
         let time_base = track
             .time_base
             .ok_or(DecodeError("Track timebase missing"))?;

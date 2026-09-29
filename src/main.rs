@@ -1,12 +1,3 @@
-use rayon::iter::ParallelIterator;
-use std::env;
-use std::path::Path;
-use std::process::exit;
-use std::sync::Arc;
-use env_logger::{Builder, Env};
-use log::{debug, error, info};
-use rayon::prelude::IntoParallelRefIterator;
-use rayon::ThreadPoolBuilder;
 use GetLyrics::api::lrclib_api::LrcLibAPI;
 use GetLyrics::api::lyric_api::LyricApi;
 use GetLyrics::hasher::dummy_hasher::DummyHasher;
@@ -15,11 +6,22 @@ use GetLyrics::metadata::metadata_extractor::MetadataExtractor;
 use GetLyrics::model::data_model::{Lyric, Song, Writer};
 use GetLyrics::parallel_helper::parallel_helper::ParallelHelper;
 use GetLyrics::traits::traits::{LyricIface, ProcessPolicy};
+use env_logger::{Builder, Env};
+use log::{debug, error, info};
+use rayon::ThreadPoolBuilder;
+use rayon::iter::ParallelIterator;
+use rayon::prelude::IntoParallelRefIterator;
+use std::env;
+use std::path::Path;
+use std::process::exit;
+use std::sync::Arc;
 
 fn main() {
     // limit API pressure requests
-    ThreadPoolBuilder::new().num_threads(6).build_global().unwrap();
-
+    ThreadPoolBuilder::new()
+        .num_threads(6)
+        .build_global()
+        .unwrap();
 
     let env = Env::new().filter_or("RUST_LOG", "info");
     Builder::from_env(env).init();
@@ -27,15 +29,16 @@ fn main() {
     let args: Vec<String> = env::args().collect();
 
     if args.len() < 2 {
-        error!("Usage: GetLyrics [-r|--recursive] [-k|--karaoke] [-f|--force] <file_or_folder>");
+        error!(
+            "Usage: GetLyrics [-r|--recursive] [-k|--karaoke] [-f|--force] [-m|--missing] <file_or_folder>"
+        );
         exit(1);
     }
-    let mut hasher: Arc<dyn ProcessPolicy> = FileHashHelper::new_with_trait().expect("Failed to create file hasher");
-
 
     let mut karaoke = false;
     let mut recursive = false;
     let mut force_scan = false;
+    let mut list_missing = false;
     let mut path: Option<String> = None;
 
     for arg in &args[1..] {
@@ -43,15 +46,26 @@ fn main() {
             "-k" | "--karaoke" => karaoke = true,
             "-r" | "--recursive" => recursive = true,
             "-f" | "--force" => force_scan = true,
+            "-m" | "--missing" => list_missing = true,
             _ => path = Some(arg.clone()),
         }
     }
 
     let Some(path) = path else {
-        panic!("Usage: GetLyrics [-r|--recursive] [-k|--karaoke] [-f|--force] <file_or_folder>");
+        panic!(
+            "Usage: GetLyrics [-r|--recursive] [-k|--karaoke] [-f|--force] [-m|--missing] <file_or_folder>"
+        );
     };
 
     let path_obj = Path::new(&path);
+
+    if list_missing {
+        report_missing(path_obj, recursive);
+        return;
+    }
+
+    let mut hasher: Arc<dyn ProcessPolicy> =
+        FileHashHelper::new_with_trait().expect("Failed to create file hasher");
 
     if force_scan {
         info!("Running force scan.");
@@ -78,8 +92,6 @@ fn process_directory(dir: &Path, karaoke: bool, recursive: bool, hasher: Arc<dyn
 }
 
 fn process_single_file(path: &Path, karaoke: bool, hasher: Arc<dyn ProcessPolicy>) {
-
-
     // --- NEW: skip if already processed ---
     match hasher.should_process(path) {
         Ok(false) => {
@@ -131,5 +143,34 @@ fn write_lyric_to_file(song: &Song, lyric: &Lyric) {
     match Writer::write_lyric(&lyric) {
         Some(_) => info!("SUCCESS: Lyrics written for: {}", &song.filename),
         None => error!("Could not write lyrics file for song {}", &song.filename),
+    }
+}
+
+/// List audio files that have no `.lrc` next to them (no fetching, no hashing).
+fn report_missing(path: &Path, recursive: bool) {
+    if path.is_dir() {
+        let mut files = ParallelHelper::collect_audio_files(path, recursive);
+        files.sort();
+        let mut missing = Writer::missing_lyrics(&files);
+        missing.sort();
+        for file in &missing {
+            println!("{}", file.display());
+        }
+        info!(
+            "Missing lyrics for {}/{} file(s) in {}",
+            missing.len(),
+            files.len(),
+            path.display()
+        );
+    } else if path.is_file() {
+        if Writer::has_lyrics(path) {
+            info!("Lyrics found for {}", path.display());
+        } else {
+            println!("{}", path.display());
+            info!("Missing lyrics for 1/1 file(s)");
+        }
+    } else {
+        error!("Invalid path: {}", path.display());
+        exit(1);
     }
 }
