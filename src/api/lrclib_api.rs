@@ -70,3 +70,43 @@ impl LyricIface for LrcLibAPI {
         }
     }
 }
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_new_karaoke_lyrics_enables_karaoke_mode() {
+        let api = LrcLibAPI::new_karaoke_lyrics();
+
+        assert!(api.karaoke);
+    }
+
+    #[test]
+    fn test_new_plain_lyrics_disables_karaoke_mode() {
+        let api = LrcLibAPI::new_plain_lyrics();
+
+        assert!(!api.karaoke);
+    }
+
+    #[test]
+    fn test_lrc_lib_response_can_hold_plain_lyrics_without_synced_lyrics() {
+        let response = LrcLibResponse {
+            plain_lyrics: String::from("Plain lyrics"),
+            synced_lyrics: None,
+        };
+
+        assert_eq!("Plain lyrics", response.plain_lyrics);
+        assert_eq!(None, response.synced_lyrics);
+    }
+
+    #[test]
+    fn test_lrc_lib_response_can_hold_synced_lyrics() {
+        let response = LrcLibResponse {
+            plain_lyrics: String::from("Plain lyrics"),
+            synced_lyrics: Some(String::from("[00:01.00] Synced lyrics")),
+        };
+
+        assert_eq!("Plain lyrics", response.plain_lyrics);
+        assert_eq!(Some(String::from("[00:01.00] Synced lyrics")), response.synced_lyrics);
+    }
+}

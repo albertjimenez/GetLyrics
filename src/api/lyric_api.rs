@@ -53,3 +53,76 @@ impl LyricIface for LyricApi {
         Err("Lyric API is down".to_owned())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_new_creates_lyric_api() {
+        let _api = LyricApi::new();
+    }
+
+    #[test]
+    fn test_sanitize_lyrics_trims_leading_and_trailing_whitespace() {
+        let lyrics = "   Some lyrics   ";
+
+        let sanitized = LyricApi::sanitize_lyrics(lyrics);
+
+        assert_eq!("Some lyrics", sanitized);
+    }
+
+    #[test]
+    fn test_sanitize_lyrics_replaces_windows_newlines_with_single_newline() {
+        let lyrics = "First line\r\nSecond line\r\nThird line";
+
+        let sanitized = LyricApi::sanitize_lyrics(lyrics);
+
+        assert_eq!("First line\nSecond line\nThird line", sanitized);
+    }
+
+    #[test]
+    fn test_sanitize_lyrics_collapses_multiple_newlines() {
+        let lyrics = "First line\n\n\nSecond line\n\nThird line";
+
+        let sanitized = LyricApi::sanitize_lyrics(lyrics);
+
+        assert_eq!("First line\nSecond line\nThird line", sanitized);
+    }
+
+    #[test]
+    fn test_sanitize_lyrics_collapses_multiple_spaces() {
+        let lyrics = "First    line with     many      spaces";
+
+        let sanitized = LyricApi::sanitize_lyrics(lyrics);
+
+        assert_eq!("First line with many spaces", sanitized);
+    }
+
+    #[test]
+    fn test_sanitize_lyrics_handles_mixed_whitespace() {
+        let lyrics = "   First    line\r\n\r\nSecond     line\n\n\nThird   line   ";
+
+        let sanitized = LyricApi::sanitize_lyrics(lyrics);
+
+        assert_eq!("First line\n\nSecond line\nThird line", sanitized);
+    }
+
+    #[test]
+    fn test_sanitize_lyrics_returns_empty_string_for_whitespace_only_input() {
+        let lyrics = "     \n\n\r\n     ";
+
+        let sanitized = LyricApi::sanitize_lyrics(lyrics);
+
+        assert_eq!("", sanitized);
+    }
+
+    #[test]
+    fn test_api_response_can_hold_lyrics() {
+        let response = ApiResponse {
+            lyrics: String::from("Some lyrics"),
+        };
+
+        assert_eq!("Some lyrics", response.lyrics);
+    }
+}
