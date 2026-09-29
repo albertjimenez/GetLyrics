@@ -19,6 +19,6 @@ RUN TARGET="$(uname -m | sed -e 's/^x86_64$/x86_64-unknown-linux-musl/' -e 's/^a
 FROM scratch
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 # Copy the musl binary from the builder stage
-COPY --from=builder /app/target/release/getlyrics /getlyrics
+COPY --from=builder /app/getlyrics /getlyrics
 # Set the entry point
 ENTRYPOINT ["/getlyrics"]
