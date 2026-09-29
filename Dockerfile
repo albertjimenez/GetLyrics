@@ -1,10 +1,9 @@
 # Stage 1: Build the application with musl
-FROM rust:1.94 AS builder
-ARG TARGETARCH
-ARG X86_NAME=x86_64-unknown-linux-musl
-ARG ARM64_NAME=aarch64-unknown-linux-musl
-# Install musl target and necessary dependencies
-RUN rustup target add $X86_NAME $ARM64_NAME  && \
+FROM rust:1.97 AS builder
+# Install musl targets and necessary dependencies.
+# Multi-arch is delegated to GH Actions (buildx builds each platform natively),
+# so `uname -m` always reports the platform currently being built — no arch branches needed.
+RUN rustup target add x86_64-unknown-linux-musl aarch64-unknown-linux-musl && \
     apt-get update && apt-get install -y musl-tools llvm clang pkg-config libssl-dev perl make ca-certificates
 
 WORKDIR /app
@@ -13,19 +12,13 @@ WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
 # Copy source code and build
 COPY src ./src
-RUN if [ "$TARGETARCH" = "amd64" ]; then \
-    cargo build --release --target $X86_NAME && \
-    mv target/$X86_NAME/release/getlyrics .; \
-    elif [ "$TARGETARCH" = "arm64" ]; then \
-    cargo build --release --target $ARM64_NAME && \
-    mv target/$ARM64_NAME/release/getlyrics .; \
-    fi
-RUN strip getlyrics
-
+RUN TARGET="$(uname -m | sed -e 's/^x86_64$/x86_64-unknown-linux-musl/' -e 's/^aarch64$/aarch64-unknown-linux-musl/')" && \
+    cargo build --release --target "$TARGET" && \
+    mv "target/$TARGET/release/getlyrics" /app/getlyrics
 # Stage 2: Create a minimal musl-based image
 FROM scratch
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 # Copy the musl binary from the builder stage
-COPY --from=builder /app/getlyrics /getlyrics
+COPY --from=builder /app/target/release/getlyrics /getlyrics
 # Set the entry point
 ENTRYPOINT ["/getlyrics"]

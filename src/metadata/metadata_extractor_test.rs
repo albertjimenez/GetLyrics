@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod metadata_extractor_tests {
-    use std::env;
     use crate::metadata::metadata_extractor::MetadataExtractor;
     use crate::model::data_model::Song;
+    use std::env;
 
     #[test]
     fn test_metadata() {
@@ -23,6 +23,5 @@ mod metadata_extractor_tests {
             assert_eq!("Roses", metadata.title);
             assert_eq!(Some(223), metadata.duration)
         }
-
     }
 }

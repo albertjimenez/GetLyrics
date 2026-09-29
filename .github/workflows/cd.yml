@@ -35,7 +35,7 @@ jobs:
             archive: targz
             exe: ""
           - os: ubuntu-latest
-            target: arm-unknown-linux-musleabihf
+            target: aarch64-unknown-linux-musl
             builder: zigbuild
             apt_pkgs: ""
             rustflags: ""

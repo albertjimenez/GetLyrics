@@ -19,9 +19,7 @@ impl ParallelHelper {
             .filter_map(Result::ok)
             .filter(|e| e.file_type().is_file())
             .map(|e| e.into_path())
-            .filter(|path| {
-                audio_exts.contains(&AudioExtensions::get_extension_by_filepath(path))
-            })
+            .filter(|path| audio_exts.contains(&AudioExtensions::get_extension_by_filepath(path)))
             .collect()
     }
 }
@@ -87,13 +85,10 @@ mod parallel_helper_tests {
 
         let mut files = ParallelHelper::collect_audio_files(root, true);
         files.sort();
-let mut expected = vec![nested_flac, nested_mp3, top_level_flac, top_level_mp3];
+        let mut expected = vec![nested_flac, nested_mp3, top_level_flac, top_level_mp3];
         expected.sort();
         files.sort();
-        assert_eq!(
-            expected,
-            files
-        );
+        assert_eq!(expected, files);
     }
 
     #[test]

@@ -29,6 +29,7 @@ A fast, reliable, and extensible Rust-based lyrics fetcher.
 - 🧩 **Trait-based architecture** for future backend extensions
 - 🧪 **Real integration tests**
 - 💪🏻**Force creation** to force redownload a lyric that may have not been found in the past
+- 🔍 **List missing lyrics** with `-m`/`--missing` (songs with no `.lrc` beside them)
 - 📦 Usable as a binary or library
 - 🐳 Docker image support for easy builds and usage
 
@@ -89,6 +90,21 @@ Combine with karaoke:
 ```bash
 ./getlyrics -r -k "/path/to/music_folder"
 ```
+
+### 🔍 List songs missing lyrics
+
+```bash
+./getlyrics --missing "/path/to/music_folder"
+```
+
+or shorter:
+
+```bash
+./getlyrics -m -r "/path/to/music_folder"
+./getlyrics --missing "/absolute/path/to/song.mp3"
+```
+
+This only checks whether a `.lrc` file sits next to each song — it fetches nothing and updates no state. Each missing song is printed on its own line (pipe-friendly), plus a `Missing x/y` summary in the log.
 ---
 
 
@@ -97,19 +113,19 @@ Combine with karaoke:
 The latest version is already available on Docker Hub with two flavours, `amd64` and `arm64`:
 
 ```bash
-docker pull beruto/getlyrics:0.3.2-amd64
+docker pull beruto/getlyrics:0.4.0
 ```
 
 Use it like this:
 
 ```bash
-docker run --rm -v "$(pwd)":/music beruto/getlyrics:0.3.2-amd64 /music/song.mp3
+docker run --rm -v "$(pwd)":/music beruto/getlyrics:0.4.0 /music/song.mp3
 ```
 
 To enable synced lyrics (karaoke mode):
 
 ```bash
-docker run --rm -v "$(pwd)":/music beruto/getlyrics:0.3.2-amd64 --karaoke /music/song.mp3
+docker run --rm -v "$(pwd)":/music beruto/getlyrics:0.4.0 --karaoke /music/song.mp3
 ```
 
 > Replace `/music/song.mp3` with the correct path inside the mounted volume.

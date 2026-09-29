@@ -107,6 +107,9 @@ mod tests {
         };
 
         assert_eq!("Plain lyrics", response.plain_lyrics);
-        assert_eq!(Some(String::from("[00:01.00] Synced lyrics")), response.synced_lyrics);
+        assert_eq!(
+            Some(String::from("[00:01.00] Synced lyrics")),
+            response.synced_lyrics
+        );
     }
 }
